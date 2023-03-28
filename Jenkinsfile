@@ -1,76 +1,33 @@
 pipeline{
-
-	agent any
-
+	agent{
+		label any
+	}
 	environment {
-		DOCKERHUB_CREDENTIALS=credentials('docker-hub')
+		DOCKER_IMAGE = 'python/app'
+
+		ECR_REPO 	= '356705062463.dkr.ecr.us-east-1.amazonaws.com/pythonwebapp'
+		APP_VERSION = "${BUILD_ID}"
+		APP_ENV 	= "${BRANCH_NAME}"
+
+		AWS_ACCESS_KEY_ID 		= credentials('AWS_ACCESS_KEY_ID')
+		AWS_SECRET_ACCESS_KEY 	= credentials('AWS_SECRET_ACCESS_KEY')
+		AWS_DEFAULT_REGION 		= 'us-east-1'
+		AWS_DEFAULT_OUTPUT 		= 'json'
+
+		STAGING_TASK 	= 'python_staging_task'
+		STAGING_CLUSTER = 'python_staging_cluster'
+		STAGING_SERVICE = 'Python_staging_srv'
+
+		RELEASE_TASK 	= 'python_release_task'
+		RELEASE_CLUSTER = 'python_release_cluster'
+		RELEASE_SERVICE = 'Python_release_srv'
 	}
-
-	stages {
-	    
-	    stage('gitclone') {
-
-			steps {
-				git 'https://github.com/nbduong01/jenkins-101.git/'
-			}
-		}
-
-		stage('Build') {
-
-			steps {
-				dir('/var/lib/jenkins/workspace/Python-pipline/s05/python-simple-app')
-				sh 'docker build -t pythonspapp:latest .'
-			}
-		}
-
-		stage('Login') {
-
-			steps {
-				sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
-			}
-		}
-
-		stage('Push') {
-
-			steps {
-				sh 'docker tag pythonspapp:latest nbduong/pythonspapp:latest'
-				sh 'docker push nbduong/pythonspapp:latest'
+	stages{
+		stage('[PYTHON] Build'){
+			steps{
+				echo "========Build App========"
+				sh '.push.sh'
 			}
 		}
 	}
-
-	post {
-		always {
-			sh 'docker logout'
-		}
-	}
-
 }
-
-/*pipeline {
-    agent any
-    stages {
-        stage('build') {
-            steps {
-                dir("${env.WORKSPACE}/s05/python-simple-app")
-                sh "pwd"
-                sh 'docker build -t apppysimple .'
-            }
-        }
-    /*  stage('run') {
-            steps {
-                sh 'python3 s05/python-simple-app/app.py &'
-            }
-        }
-
-       stage('') {
-            steps {
-                sh 'sleep 60 && curl -s localhost:8000'
-            }
-        }
-
-        stage('cleanup') {
-            steps {
-                sh 'fuser -k 8000/tcp'
-            }
-*/
