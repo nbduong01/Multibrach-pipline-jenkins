@@ -1,76 +1,58 @@
 pipeline{
-
-	agent any
-
+	agent{
+		label any
+	}
 	environment {
-		DOCKERHUB_CREDENTIALS=credentials('docker-hub')
+		DOCKER_IMAGE = 'python/app'
+
+		ECR_REPO 	= '356705062463.dkr.ecr.us-east-1.amazonaws.com/pythonwebapp'
+		APP_VERSION = "${BUILD_ID}"
+		APP_ENV 	= "${BRANCH_NAME}"
+
+		AWS_ACCESS_KEY_ID 		= credentials('AWS_ACCESS_KEY_ID')
+		AWS_SECRET_ACCESS_KEY 	= credentials('AWS_SECRET_ACCESS_KEY')
+		AWS_DEFAULT_REGION 		= 'us-east-1'
+		AWS_DEFAULT_OUTPUT 		= 'json'
+
+		STAGING_TASK 	= 'python_staging_task'
+		STAGING_CLUSTER = 'python_staging_cluster'
+		STAGING_SERVICE = 'Python_staging_srv'
+
+		RELEASE_TASK 	= 'python_release_task'
+		RELEASE_CLUSTER = 'python_release_cluster'
+		RELEASE_SERVICE = 'Python_release_srv'
 	}
-
-	stages {
-	    
-	    stage('gitclone') {
-
-			steps {
-				git 'https://github.com/nbduong01/jenkins-101.git/'
+	stages{
+		stage('[PYTHON] Build'){
+			steps{
+				echo "========BUILD App========"
+				sh 'sudo docker build -t ${DOCKER_IMAGE}:${BUILD_ID} .'
+				sh 'sudo docker tag ${DOCKER_IMAGE}:${BUILD_ID} ${ECR_REPO}:${BUILD_ID}'
 			}
 		}
+		stage('[PYTHON] Push to ECR'){
+			steps{
+				echo "========PUSH to ECR========"
+				sh '''
+				export AWS_ACCESS_KEY_ID 		= ${AWS_ACCESS_KEY_ID}
+				export AWS_SECRET_ACCESS_KEY 	= ${AWS_SECRET_ACCESS_KEY}
+				export AWS_DEFAULT_REGION 		= ${AWS_DEFAULT_REGION}
+				export AWS_DEFAULT_OUTPUT 		= ${AWS_DEFAULT_OUTPUT}
 
-		stage('Build') {
+				sudo aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | sudo docker login --username AWS --password-stdin 356705062463.dkr.ecr.us-east-1.amazonaws.com
 
-			steps {
-				dir('/var/lib/jenkins/workspace/Python-pipline/s05/python-simple-app')
-				sh 'docker build -t pythonspapp:latest .'
+				sudo docker push ${ECR_REPO}:${BUILD_ID}
+				'''
 			}
 		}
-
-		stage('Login') {
-
-			steps {
-				sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
+		stage('[PYTHON] Deploy to staging') {
+			when{
+				branch 'staging'
 			}
-		}
+			steps{
+				echo "========DEPLOY TO STAGING========"
 
-		stage('Push') {
-
-			steps {
-				sh 'docker tag pythonspapp:latest nbduong/pythonspapp:latest'
-				sh 'docker push nbduong/pythonspapp:latest'
 			}
 		}
 	}
-
-	post {
-		always {
-			sh 'docker logout'
-		}
-	}
-
 }
-
-/*pipeline {
-    agent any
-    stages {
-        stage('build') {
-            steps {
-                dir("${env.WORKSPACE}/s05/python-simple-app")
-                sh "pwd"
-                sh 'docker build -t apppysimple .'
-            }
-        }
-    /*  stage('run') {
-            steps {
-                sh 'python3 s05/python-simple-app/app.py &'
-            }
-        }
-
-       stage('') {
-            steps {
-                sh 'sleep 60 && curl -s localhost:8000'
-            }
-        }
-
-        stage('cleanup') {
-            steps {
-                sh 'fuser -k 8000/tcp'
-            }
-*/
