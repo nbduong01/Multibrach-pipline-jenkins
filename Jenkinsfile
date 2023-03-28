@@ -25,8 +25,33 @@ pipeline{
 	stages{
 		stage('[PYTHON] Build'){
 			steps{
-				echo "========Build App========"
-				sh '.push.sh'
+				echo "========BUILD App========"
+				sh 'sudo docker build -t ${DOCKER_IMAGE}:${BUILD_ID} .'
+				sh 'sudo docker tag ${DOCKER_IMAGE}:${BUILD_ID} ${ECR_REPO}:${BUILD_ID}'
+			}
+		}
+		stage('[PYTHON] Push to ECR'){
+			steps{
+				echo "========PUSH to ECR========"
+				sh '''
+				export AWS_ACCESS_KEY_ID 		= ${AWS_ACCESS_KEY_ID}
+				export AWS_SECRET_ACCESS_KEY 	= ${AWS_SECRET_ACCESS_KEY}
+				export AWS_DEFAULT_REGION 		= ${AWS_DEFAULT_REGION}
+				export AWS_DEFAULT_OUTPUT 		= ${AWS_DEFAULT_OUTPUT}
+
+				sudo aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | sudo docker login --username AWS --password-stdin 356705062463.dkr.ecr.us-east-1.amazonaws.com
+
+				sudo docker push ${ECR_REPO}:${BUILD_ID}
+				'''
+			}
+		}
+		stage('[PYTHON] Deploy to staging') {
+			when{
+				branch 'staging'
+			}
+			steps{
+				echo "========DEPLOY TO STAGING========"
+
 			}
 		}
 	}
